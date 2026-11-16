@@ -1,7 +1,7 @@
 //@name beat_rain_rhythm
 //@display-name Risu-BEAT
 //@api 3.0
-//@version 5.38.1
+//@version 5.38.4
 //@link https://github.com/HHHedge/Risu-BEAT GitHub
 //@update-url https://raw.githubusercontent.com/HHHedge/Risu-BEAT/main/Risu-BEAT.js
 
@@ -108,14 +108,13 @@
   /* 노트 한 개 그리기 — 플랫: 바닥이 타이밍(y)인 가로 막대 / 서클: 중심이 타이밍(y)인 동그라미.
    * 서클은 색·지름마다 미리 그려 둔 그림을 찍는다 (매 프레임 원 그리기 비용을 줄임) */
   const CIRC = new Map();
+  // 서클 노트: 플랫 노트처럼 장식 없이 단색 원
   function circSprite(col, d, dpr) {
     const k = col + '|' + Math.round(d * dpr); let cv = CIRC.get(k);
     if (cv) return cv;
     const px = Math.max(4, Math.round(d * dpr)); cv = document.createElement('canvas'); cv.width = cv.height = px + 2;
     const g = cv.getContext('2d'), r = px / 2, cx = r + 1;
     g.fillStyle = col; g.beginPath(); g.arc(cx, cx, r, 0, Math.PI * 2); g.fill();
-    g.lineWidth = Math.max(1, px * 0.06); g.strokeStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.arc(cx, cx, r - g.lineWidth / 2, 0, Math.PI * 2); g.stroke();
-    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(cx - r * 0.22, cx - r * 0.3, r * 0.42, r * 0.24, -0.5, 0, Math.PI * 2); g.fill();
     if (CIRC.size > 64) CIRC.clear();
     CIRC.set(k, cv); return cv;
   }
@@ -3747,13 +3746,17 @@
   .inf{position:relative;flex:1;min-height:0;margin:16px 4px 0;padding:20px 16px 14px 20px;z-index:0;}
   .inf::before{content:"";position:absolute;inset:0;z-index:-1;background:rgba(10,10,18,.62);border:4px solid #000;outline:2px solid rgba(255,255,255,.85);outline-offset:-9px;transform:skewX(-2deg);box-shadow:8px 8px 0 rgba(0,0,0,.85);}
   .inf-tag{position:absolute;top:-16px;left:20px;padding:2px 13px;font-family:var(--disp);font-style:italic;font-size:13px;color:#fff;z-index:2;}
-  .inf-shape{position:absolute;top:-17px;right:20px;display:flex;z-index:3;transform:skewX(-12deg);border:3px solid #000;box-shadow:3px 3px 0 #000;background:#14161f;}
-  .inf-shape button{appearance:none;border:0;background:transparent;color:#8b90a8;font-family:var(--disp);font-style:italic;font-weight:900;font-size:12px;padding:3px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;}
+  /* 엄지 모드(왼쪽 끝) · 노트 디자인(오른쪽 끝): 화면이 좁아지면 안쪽으로 모이고, 맞닿으면 --os 비율로 함께 줄어든다 (최소 80%) */
+  .i-opt{grid-column:1 / -1;display:flex;justify-content:space-between;align-items:stretch;gap:8px;--os:1;}
+  .inf-shape{flex:none;display:flex;transform:skewX(-10deg);border:3px solid #000;box-shadow:3px 3px 0 #000;background:#14161f;}
+  .inf-shape button{appearance:none;border:0;background:transparent;color:#8b90a8;font-family:var(--disp);font-style:italic;font-weight:900;font-size:calc(12px * var(--os));padding:calc(3px * var(--os)) calc(10px * var(--os));display:flex;align-items:center;gap:calc(6px * var(--os));cursor:pointer;touch-action:manipulation;white-space:nowrap;}
   .inf-shape button + button{border-left:2px solid #000;}
+  .inf-shape .sh-l{display:flex;align-items:center;padding:calc(3px * var(--os)) calc(10px * var(--os));font-size:calc(12px * var(--os));font-weight:900;color:#fff;background:#000;white-space:nowrap;}
   .inf-shape button.on{background:var(--acc);color:#fff;}
   .inf-shape button:focus-visible{outline:2px solid #fff;outline-offset:-4px;}
   .inf-shape i{display:inline-block;background:currentColor;flex:none;}
-  .inf-shape .sh-f{width:14px;height:4px;} .inf-shape .sh-c{width:9px;height:9px;border-radius:50%;}
+  .i-opt.noico .inf-shape i{display:none;}   /* 80%로도 모자랄 때만 모양 아이콘 생략 */
+  .inf-shape .sh-f{width:calc(14px * var(--os));height:calc(4px * var(--os));} .inf-shape .sh-c{width:calc(9px * var(--os));height:calc(9px * var(--os));border-radius:50%;}
   .inf-tag::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--acc);border:3px solid #000;transform:skewX(-12deg);box-shadow:3px 3px 0 #000;}
   .inf-in{position:relative;height:100%;display:flex;flex-direction:column;gap:10px;overflow-y:auto;overflow-x:hidden;padding:2px 14px 8px;margin:0 -6px;}
   .inf-in > *{position:relative;flex:none;}
@@ -3806,12 +3809,11 @@
   .i-lamp span.cl{background:var(--neo);color:#000;} .i-lamp span.fc{background:#ffe14d;color:#000;}
   .i-no{flex:1;text-align:center;font-size:13px;font-weight:800;color:#888;}
   .i-add{flex:1 !important;min-height:90px;font-size:15px;}
-  .i-bot{margin-top:auto;display:flex;gap:12px;align-items:stretch;padding-top:4px;}
+  .i-bot{margin-top:auto;display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 10px;align-items:end;padding-top:4px;}   /* 위: 엄지 모드 · 노트 디자인 / 아래: 4K·6K · START */
   .i-bot .kmode{align-items:stretch;} .i-bot .kmode button{min-width:54px;}
-  .i-bot .start{flex:1;min-width:0;padding:10px;}
-  .i-kc{flex:none;display:flex;flex-direction:column;gap:8px;}
-  .i-kc .kmode{flex:1;}
-  #rb .i-kc .thb{margin:0;width:100%;font-size:12px;padding:6px 4px;text-align:center;white-space:nowrap;}
+  .i-bot .start{min-width:0;padding:10px;}
+  .i-bot .kmode button{min-height:61px;}
+  #rb .i-opt .thb{flex:none;margin:0;font-size:calc(12px * var(--os));padding:calc(6px * var(--os)) calc(12px * var(--os));text-align:center;white-space:nowrap;}
   .start small{display:block;font-family:system-ui,sans-serif;font-style:normal;font-size:11px;font-weight:800;letter-spacing:1px;text-shadow:none;color:#eadcff;margin-top:1px;}
   @media (max-height:700px){.i-st{display:none;}}
   /* ---- 팝업 ---- */
@@ -3880,6 +3882,7 @@
     .inf::before{transform:skewX(-4deg);}
     .inf-in{height:auto;max-height:100%;gap:15px;overflow:visible;padding:2px 8px 6px;margin:0;}
     .inf-tag{font-size:14px;left:22px;}
+    .i-bot{gap:8px 12px;}
     .i-t{font-size:clamp(26px,2.7vw,36px);}
     .i-g{font-size:13px;}
     .i-kv b{font-size:19px;}
@@ -3888,7 +3891,7 @@
     .i-bs b{font-size:26px;} .i-bs span{font-size:12px;}
     .i-lamp span{font-size:11px;padding:2px 8px;}
     .i-best{padding:12px 16px;}
-    .i-bot .start{padding:14px;}
+    .i-bot .start{padding:14px;} .i-bot .kmode button{min-height:77px;}
     .song-h{margin-bottom:12px;}
     .song-t{font-size:22px;} .song-m{font-size:13px;}
     .df{padding:12px 6px;} .df-n{font-size:13px;} .df-l{font-size:24px;margin:2px 0;} .df-b{font-size:12px;}
@@ -4633,7 +4636,7 @@
       <div class="sl-body">
         <div class="whl"><div class="whl-d">${ids.map(wItem).join('')}</div><div class="whl-lk"></div><div class="whl-f t"></div><div class="whl-f b"></div>
           <div class="whl-ix"></div></div>
-        <div class="inf"><div class="inf-tag">MUSIC INFO</div><div class="inf-shape" role="group" aria-label="노트 모양"><button data-act="shape" data-v="flat" aria-label="플랫 노트"><i class="sh-f"></i>FLAT</button><button data-act="shape" data-v="circle" aria-label="서클 노트"><i class="sh-c"></i>CIRCLE</button></div><div class="inf-in"></div><button class="exq" data-act="exhelp" aria-label="EX-OVERDRIVE 안내" aria-expanded="false" hidden>?</button><div class="exq-pop" role="dialog" aria-label="EX-OVERDRIVE 안내" hidden><b>EX-OVERDRIVE</b><p>&lt;내 음악&gt; 전용의 더욱 도전적인 난이도입니다.</p><p>토글을 켜면 EX-OVERDRIVE를 플레이할 수 있습니다.</p><p>기록은 따로 저장됩니다.</p></div></div>
+        <div class="inf"><div class="inf-tag">MUSIC INFO</div><div class="inf-in"></div><button class="exq" data-act="exhelp" aria-label="EX-OVERDRIVE 안내" aria-expanded="false" hidden>?</button><div class="exq-pop" role="dialog" aria-label="EX-OVERDRIVE 안내" hidden><b>EX-OVERDRIVE</b><p>&lt;내 음악&gt; 전용의 더욱 도전적인 난이도입니다.</p><p>토글을 켜면 EX-OVERDRIVE를 플레이할 수 있습니다.</p><p>기록은 따로 저장됩니다.</p></div></div>
       </div>`;
     syncShape();
     renderInfo();
@@ -4672,7 +4675,7 @@
     box.innerHTML = `<div class="i-top"><div class="i-t">${esc(title)}</div><div class="i-gr"><span class="i-g">${esc(genre)}</span></div></div>${fileBtns}${st}
       <div class="i-sec">DIFFICULTY${isF ? `<button class="exb ${S.exOD ? 'on' : ''}" data-act="exod" aria-pressed="${S.exOD ? 'true' : 'false'}">EX-OVERDRIVE ${S.exOD ? 'ON' : 'OFF'}</button>` : ''}</div><div class="dfs">${dfs}</div>
       <div class="i-sec">BEST · ${DIFFS[d].name}</div>${best}
-      <div class="i-bot"><div class="i-kc"><button class="exb thb ${S.thumb ? 'on' : ''}" data-act="thumb" aria-pressed="${S.thumb ? 'true' : 'false'}">엄지 모드 ${S.thumb ? 'ON' : 'OFF'}</button>${kk}</div><button class="start" data-act="start"${done || isF ? '' : ''}>START<small>${S.keys}K · ${DIFFS[d].name}${S.thumb ? ' · 👍' : ''}</small></button></div>`;
+      <div class="i-bot"><div class="i-opt"><button class="exb thb ${S.thumb ? 'on' : ''}" data-act="thumb" aria-pressed="${S.thumb ? 'true' : 'false'}">엄지 모드 ${S.thumb ? 'ON' : 'OFF'}</button><div class="inf-shape" role="group" aria-label="노트 디자인"><span class="sh-l">노트 디자인</span><button class="${S.noteShape !== 'circle' ? 'on' : ''}" data-act="shape" data-v="flat" aria-label="플랫 노트"><i class="sh-f"></i>FLAT</button><button class="${S.noteShape === 'circle' ? 'on' : ''}" data-act="shape" data-v="circle" aria-label="서클 노트"><i class="sh-c"></i>CIRCLE</button></div></div>${kk}<button class="start" data-act="start"${done || isF ? '' : ''}>START<small>${S.keys}K · ${DIFFS[d].name}${S.thumb ? ' · 👍' : ''}</small></button></div>`;
     slantInfo();
   }
   const exOn = (isF) => !!(isF && S.exOD);
@@ -4680,8 +4683,21 @@
   function syncShape() { if (!selEl) return; selEl.querySelectorAll('.inf-shape button').forEach((x) => { const on = x.dataset.v === (S.noteShape || 'flat'); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
   const vocalBtn = () => `<button class="fbtn vc ${S.fileVocal ? 'on' : ''}" data-act="vocal" aria-pressed="${S.fileVocal ? 'true' : 'false'}">보컬곡 ${S.fileVocal ? 'ON' : 'OFF'}</button>`;
   // 패널 내부 요소를 패널 옆면(사선) 기울기를 따라 가로로 밀어 배치 (패널 중심 기준)
+  // 엄지 모드 · 노트 디자인 줄: 두 버튼 폭 + 간격 8px이 줄 폭을 넘으면 같은 비율로 줄인다 (최소 0.8, 그래도 넘치면 아이콘 생략 후 0.7까지)
+  function fitOpt() {
+    const o = selEl && selEl.querySelector('.i-opt'); if (!o) return;
+    o.classList.remove('noico'); o.style.setProperty('--os', '1');
+    const need = () => [...o.children].reduce((a, e) => a + e.getBoundingClientRect().width, 0) + 8 + 6;   // 6 = 기울기·그림자 여유
+    const avail = o.clientWidth, n1 = need();
+    if (n1 <= avail) return;
+    let k = 1, n = n1;
+    const shrink = (lo) => { for (let i = 0; i < 6 && n > avail && k > lo; i++) { k = Math.max(lo, k * (avail - 1) / n); o.style.setProperty('--os', k.toFixed(3)); n = need(); } };   // 테두리 등 고정 폭이 있어 몇 번 다듬는다
+    shrink(0.8);
+    if (n > avail + 1) { o.classList.add('noico'); n = need(); shrink(0.7); }   // 80%로도 넘치면 아이콘을 빼고, 그래도 넘치는 아주 좁은 화면(320px 등)만 70%까지
+  }
   function slantInfo() {
     const box = selEl && selEl.querySelector('.inf-in'); if (!box) return;
+    fitOpt();
     const pc = window.innerWidth >= 900 && window.innerHeight >= 560, tn = Math.tan((pc ? 4 : 2) * Math.PI / 180);
     const kids = [...box.children]; kids.forEach((k) => { k.style.left = '0px'; });
     const H2 = box.offsetHeight;
