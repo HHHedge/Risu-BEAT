@@ -1,7 +1,7 @@
 //@name beat_rain_rhythm
 //@display-name Risu-BEAT
 //@api 3.0
-//@version 5.38.4
+//@version 5.39.2
 //@link https://github.com/HHHedge/Risu-BEAT GitHub
 //@update-url https://raw.githubusercontent.com/HHHedge/Risu-BEAT/main/Risu-BEAT.js
 
@@ -2898,10 +2898,7 @@
     if (G.fv > 0.01) drawFever(c, n, t);
     // 외곽 글로우: 레인과 기어를 한 덩어리로 감싼다 (레인 위 끝 ~ 기어 아래 끝). 2박마다 통 튀고 천천히 잦아든다
     //  · 여기서는 바깥으로 번지는 넓은 빛만 그리고, 선 자체는 기어를 그린 뒤 위에 한 번 더 그린다 (기어 가장자리를 덮도록)
-    const FRM = (() => {
-      const pulse = beatPulse(t), lwF = 4 + 2.5 * pulse, gc = mixRGB([255, 255, 255], ACC_FV, G.fv || 0), P = frameShape();
-      return { pulse, lw: lwF, gc, P, lite: S.fx === 'lite' };
-    })();
+    const FRM = { P: frameShape() };
     {
       // 베젤: 테두리 안쪽, 레인·기어 바깥의 틈을 어둡게 채운다
       c.fillStyle = '#0c0a18'; polyPath(c, FRM.P); c.fill();
@@ -3022,10 +3019,7 @@
     drawGear(c, n);
     // 외곽 선: 레인과 기어 위에 다시 그린다. 안쪽으로는 번지지 않게 선 안쪽을 잘라 낸다
     {
-      c.save(); c.lineJoin = 'miter'; c.miterLimit = 6;
-      c.strokeStyle = `rgba(${FRM.gc},${0.6 + 0.4 * FRM.pulse})`; c.lineWidth = FRM.lw;
-      polyPath(c, FRM.P); c.stroke();
-      c.restore();
+      drawMetalFrame(c, FRM.P);
       // 안쪽 퍼플 가는 선
       c.save(); c.lineJoin = 'miter'; c.strokeStyle = 'rgba(214,166,255,0.75)'; c.lineWidth = 1.5; polyPath(c, insetPoly(FRM.P, 6)); c.stroke(); c.restore();
     }
@@ -3156,12 +3150,10 @@
   /* 피버 (50콤보 이상): 화면 전체 블루 점멸(2박마다) + 가장자리 비네트 + 레인 바깥에서 떠오르는 플로트 */
   const FL_SYM = ['★', '♪', '♫', '✦', '●', '♥', '✚'], FL_COL = ['#8fd0ff', '#5ab8ff', '#3d8bff', '#e6f6ff', '#6fe0ff'];
   function drawFever(c, n, t) {
-    const { W: Wd, H } = L, f = G.fv, k = f * (0.35 + 0.65 * beatPulse(t));
-    c.fillStyle = `rgba(30,120,255,${0.22 * k})`; c.fillRect(0, 0, Wd, H);
-    if (S.fx === 'lite') return;   // 가볍게: 점멸만 (비네트·플로트 생략)
-    const vg = c.createRadialGradient(Wd / 2, H / 2, Math.min(Wd, H) * 0.35, Wd / 2, H / 2, Math.hypot(Wd, H) * 0.6);
-    vg.addColorStop(0, 'rgba(30,120,255,0)'); vg.addColorStop(1, `rgba(30,120,255,${0.42 * k})`);
-    c.fillStyle = vg; c.fillRect(0, 0, Wd, H);
+    const { W: Wd, H } = L, f = G.fv;
+    // 화면: 점멸 없이 옅은 블루만 (눈부심 의견으로 비네팅 점멸 제거)
+    c.fillStyle = `rgba(30,120,255,${0.16 * f})`; c.fillRect(0, 0, Wd, H);
+    if (S.fx === 'lite') return;   // 가볍게: 플로트 생략
     G.floats = G.floats || [];
     // 새 플로트: 레인·기어 바깥 좌우 여백에서만
     const zl = Math.max(0, L.cl - 10), zr = Math.max(0, Wd - (L.left + L.pw + 14));
@@ -3977,6 +3969,17 @@
     const ct = 16, cb = 10, x0 = L.left - 13, x1 = L.left + L.pw + 13, y0 = L.top - 4, y1 = L.H - 2;
     return [[x0 + ct, y0], [x1 - ct, y0], [x1, y0 + ct], [x1, y1 - cb], [x1 - cb, y1], [x0 + cb, y1], [x0, y1 - cb], [x0, y0 + ct]];
   }
+  // 건메탈 테두리: 바깥에서 안쪽으로 1px 고리를 단면 색 순서대로 (움직이지 않는다) + 옅은 빛 반사
+  const METAL = ['#000', '#2c2f39', '#555a69', '#868b9b', '#adb1bf', '#c4c8d3', '#9a9fae', '#6c7182', '#4a4e5b', '#363944', '#000'];
+  function drawMetalFrame(c, P) {
+    const n = METAL.length, half = (n - 1) / 2;
+    c.save(); c.lineJoin = 'miter'; c.lineWidth = 1.25;
+    for (let i = 0; i < n; i++) { c.strokeStyle = METAL[i]; polyPath(c, insetPoly(P, i - half)); c.stroke(); }
+    const xs = P.map((p) => p[0]), ys = P.map((p) => p[1]), gr = c.createLinearGradient(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+    gr.addColorStop(0, 'rgba(255,255,255,0.35)'); gr.addColorStop(0.3, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.22)'); gr.addColorStop(0.75, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)');
+    c.strokeStyle = gr; c.lineWidth = n - 3; polyPath(c, P); c.stroke();
+    c.restore();
+  }
   const polyPath = (g, P) => { g.beginPath(); P.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); g.closePath(); };
   // 볼록 다각형을 안쪽으로 d만큼 줄인다 (모서리마다 이웃 변 법선의 평균 방향)
   function insetPoly(P, d) {
@@ -3990,15 +3993,8 @@
     }
     return out;
   }
-  let GLOW_G = null, GLOW_S = null, GLOW_W = null, GLOW_SIG = '';
-  // 흰 테두리 번짐 붙이기 (k = 밝기, fv = 피버 섞임)
-  function drawFrameGlow(c, k, fv) {
-    if (!GLOW_W || !GLOW_G) return; const gd = GLOW_G, arr = GLOW_W;
-    c.save(); c.globalCompositeOperation = 'lighter';
-    if (fv < 0.99) { c.globalAlpha = clamp(k * (1 - fv), 0, 1); c.drawImage(arr[0], gd.x, gd.y, gd.w, gd.h); }
-    if (fv > 0.01) { c.globalAlpha = clamp(k * fv, 0, 1); c.drawImage(arr[1], gd.x, gd.y, gd.w, gd.h); }
-    c.restore();
-  }
+  let GLOW_G = null, GLOW_S = null, GLOW_F = null, GLOW_B = null, GLOW_SIG = '';
+  const FEVER_GLOW = '#b44dff', BASE_GLOW = 'rgb(61,140,255)';
   function buildGlow() {
     const { W: Wd, H, left, top, pw } = L, sig = Wd + 'x' + H + ':' + left + ':' + top + ':' + pw + ':' + (SPKIMG && SPKIMG !== 'loading' ? 1 : 0);
     if (sig === GLOW_SIG) return; GLOW_SIG = sig;
@@ -4014,15 +4010,23 @@
       // 안쪽(레인·기어 위)으로 번진 빛은 지운다 → 바깥으로만
       g.globalAlpha = 1; g.shadowBlur = 0; g.globalCompositeOperation = 'destination-out'; polyPath(g, P); g.fill();
       GLOW_G = { cv: cv2, x: x - pad, y: y - pad, w: w + pad * 2, h: h + pad * 2 };
-      // 흰 테두리의 바깥 번짐 (넓은 것·가까운 것) — 흰색과 피버 블루 두 벌. 박자에 맞춰 밝기만 바꿔 붙인다
-      const mk = (col) => { const cv3 = document.createElement('canvas'); cv3.width = cv2.width; cv3.height = cv2.height; const g3 = cv3.getContext('2d');
-        g3.scale(sc, sc); g3.translate(pad - x, pad - y); g3.strokeStyle = `rgb(${col})`; g3.shadowColor = `rgb(${col})`; g3.lineJoin = 'miter'; g3.lineWidth = 5; g3.globalCompositeOperation = 'lighter';
-        for (const [blur, a] of [[56, 0.55], [18, 0.8]]) { g3.globalAlpha = a; g3.shadowBlur = blur * sc; polyPath(g3, P); g3.stroke(); }   // 넓게 + 가깝게 한 장에
-        g3.globalAlpha = 1; g3.shadowBlur = 0; g3.globalCompositeOperation = 'destination-out'; polyPath(g3, P); g3.fill(); return cv3; };
-      // 보라 네온 위에 흰(피버 때 블루) 번짐을 얹은 합본 두 장 → 매 프레임 한 장만 붙인다 (피버 전환 중에만 두 장)
-      const both = (col) => { const w3 = mk(col), cv4 = document.createElement('canvas'); cv4.width = cv2.width; cv4.height = cv2.height; const g4 = cv4.getContext('2d');
-        g4.drawImage(cv2, 0, 0); g4.globalCompositeOperation = 'lighter'; g4.drawImage(w3, 0, 0); return cv4; };
-      GLOW_W = [both('255,255,255'), both(ACC_FV.join(','))];
+      // 평소: 작은 블루 번짐 (피버의 큰 퍼플 번짐과 구분되게)
+      {
+        const cb = document.createElement('canvas'); cb.width = cv2.width; cb.height = cv2.height; const gb = cb.getContext('2d');
+        gb.scale(sc, sc); gb.translate(pad - x, pad - y); gb.strokeStyle = BASE_GLOW; gb.shadowColor = BASE_GLOW; gb.lineJoin = 'miter'; gb.globalCompositeOperation = 'lighter';
+        for (const [blur, lw2, a] of [[44, 12, 0.75], [20, 8, 0.8], [8, 5, 0.8]]) { gb.globalAlpha = a; gb.shadowBlur = blur * sc; gb.lineWidth = lw2; polyPath(gb, P); gb.stroke(); }
+        gb.globalAlpha = 1; gb.shadowBlur = 0; gb.globalCompositeOperation = 'destination-out'; polyPath(gb, P); gb.fill();
+        GLOW_B = cb;
+      }
+      // 피버: 테두리 바깥으로만 번지는 퍼플 빛 (큰 퍼플 네온에 더해 가장자리를 또렷하게). 안쪽은 지운다
+      {
+        const cv5 = document.createElement('canvas'); cv5.width = cv2.width; cv5.height = cv2.height; const g5 = cv5.getContext('2d');
+        g5.scale(sc, sc); g5.translate(pad - x, pad - y); g5.lineJoin = 'miter'; g5.globalCompositeOperation = 'lighter';
+        const O = insetPoly(P, -6);
+        for (const [blur, a, lw2] of [[70, 0.8, 16], [31, 1, 10], [10, 1, 6]]) { g5.globalAlpha = a; g5.strokeStyle = FEVER_GLOW; g5.shadowColor = FEVER_GLOW; g5.shadowBlur = blur * sc; g5.lineWidth = lw2; polyPath(g5, O); g5.stroke(); }
+        g5.globalAlpha = 1; g5.shadowBlur = 0; g5.globalCompositeOperation = 'destination-out'; polyPath(g5, O); g5.fill();
+        GLOW_F = cv5;
+      }
     }
     // 스피커 실루엣: 보라로 칠한 실루엣을 흐림 두 겹으로 그린 뒤, 실루엣 자리는 비운다 (스피커가 그 위에 덮인다)
     GLOW_S = null;
@@ -4037,27 +4041,41 @@
       for (const [blur, a] of [[100, 1], [100, 1], [56, 1], [56, 0.9], [22, 0.9], [9, 0.8]]) { g.globalAlpha = a; g.shadowBlur = blur * sc; g.drawImage(sil, p2, p2, w, h); }
       g.globalCompositeOperation = 'source-over';
       g.globalAlpha = 1; g.shadowBlur = 0; g.globalCompositeOperation = 'destination-out'; g.drawImage(sil, p2, p2, w, h);
-      GLOW_S = { cv: cv2, pad: p2, w: w + p2 * 2, h: h + p2 * 2, iw: w, ih: h };
+      // 평소용: 같은 실루엣에 작은 블루 번짐
+      const sb = document.createElement('canvas'); sb.width = sil.width; sb.height = sil.height;
+      const sbg = sb.getContext('2d'); sbg.drawImage(img, 0, 0, w, h); sbg.globalCompositeOperation = 'source-in'; sbg.fillStyle = BASE_GLOW; sbg.fillRect(0, 0, w, h);
+      const cb = document.createElement('canvas'); cb.width = cv2.width; cb.height = cv2.height;
+      const gb = cb.getContext('2d'); gb.scale(sc, sc); gb.shadowColor = BASE_GLOW; gb.globalCompositeOperation = 'lighter';
+      for (const [blur, a] of [[40, 0.8], [18, 0.8], [7, 0.7]]) { gb.globalAlpha = a; gb.shadowBlur = blur * sc; gb.drawImage(sb, p2, p2, w, h); }
+      gb.globalAlpha = 1; gb.shadowBlur = 0; gb.globalCompositeOperation = 'destination-out'; gb.drawImage(sb, p2, p2, w, h);
+      GLOW_S = { cv: cv2, cvB: cb, pad: p2, w: w + p2 * 2, h: h + p2 * 2, iw: w, ih: h };
     }
   }
   function drawBackGlow(c, t) {
     if (G.sel && G.sel.type === 'calib') return;
     buildGlow();
-    const pulse = beatPulse(t), a = 0.7 + 0.3 * pulse;
+    const fvG = clamp(G.fv || 0, 0, 1);
     c.save(); c.globalCompositeOperation = 'lighter';
-    // 스피커 (스피커와 같은 기울기·위치·눌림으로)
+    // 스피커 (스피커와 같은 기울기·위치·눌림으로): 점멸 없이 평소엔 작은 블루, 피버 땐 큰 퍼플
     if (GLOW_S && L.wide) {
       const { H, left, pw } = L, gs = GLOW_S, y = H - gs.ih * 0.96;
       for (const side of [-1, 1]) {
         const tuck = gs.iw * SPK_TUCK, inner = side < 0 ? left - 6 + tuck : left + pw + 6 - tuck;
         c.save(); c.translate(inner, H); c.rotate(side < 0 ? -SPK_TILT : SPK_TILT); c.scale(side < 0 ? 1 : -1, SPK_SQ || 1);
-        c.globalAlpha = a; c.drawImage(gs.cv, -gs.iw - gs.pad, y - H - gs.pad, gs.w, gs.h); c.restore();
+        if (fvG < 0.99) { c.globalAlpha = 1 - fvG; c.drawImage(gs.cvB, -gs.iw - gs.pad, y - H - gs.pad, gs.w, gs.h); }
+        if (fvG > 0.01) { c.globalAlpha = fvG; c.drawImage(gs.cv, -gs.iw - gs.pad, y - H - gs.pad, gs.w, gs.h); }
+        c.restore();
       }
     }
     c.restore();
-    // 기어+레인 테두리: 보라 네온 + 흰 테두리 번짐 합본 (가볍게 옵션은 보라만)
-    if (GLOW_G) { if (S.fx === 'lite') { c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = a; c.drawImage(GLOW_G.cv, GLOW_G.x, GLOW_G.y, GLOW_G.w, GLOW_G.h); c.restore(); }
-      else drawFrameGlow(c, 0.6 + 0.4 * pulse, G.fv || 0); }
+    // 기어+레인 테두리 번짐: 점멸 없이 고정. 평소엔 작은 블루, 피버 땐 큰 퍼플로 바뀐다
+    if (GLOW_G) {
+      const fv = clamp(G.fv || 0, 0, 1), g = GLOW_G;
+      c.save(); c.globalCompositeOperation = 'lighter';
+      if (GLOW_B && fv < 0.99) { c.globalAlpha = 1 - fv; c.drawImage(GLOW_B, g.x, g.y, g.w, g.h); }
+      if (fv > 0.01) { c.globalAlpha = fv; c.drawImage(g.cv, g.x, g.y, g.w, g.h); if (GLOW_F) { c.globalAlpha = fv * 0.6; c.drawImage(GLOW_F, g.x, g.y, g.w, g.h); } }
+      c.restore();
+    }
   }
   function drawSpeakers(c, t) {
     const img = SPKIMG; if (!img || img === 'loading' || !L.wide || L.full || (G.sel && G.sel.type === 'calib')) return;
@@ -4324,37 +4342,46 @@
     root.querySelector('#br-slow').addEventListener('click', () => changeSpeed(-1));
     root.querySelector('#br-fast').addEventListener('click', () => changeSpeed(1));
 
-    // 플레이 입력 (화면 아래 버튼 줄)
+    // 플레이 입력 (터치 전용). 화면 아래 절반 안에서 레인 폭으로 레인을 정한다 (버튼 줄 위쪽 레인을 눌러도 입력)
+    //  손가락마다 원본 터치 이벤트(changedTouches)로 받는다. 포인터 이벤트는 동시·연타 터치를 늦추거나 취소하는 브라우저가 있어 쓰지 않는다
+    //  (PC는 키보드로 친다. 마우스로 레인을 누르는 입력은 받지 않는다)
     const laneAt = (x, y) => {
-      if (y < L.btnTop - 6 || y > L.H) return -1;
+      if (y < L.H / 2 || y > L.H) return -1;
       const l = Math.floor((x - L.left) / L.lw);
       return l >= 0 && l < G.keys ? l : -1;
     };
-    cv.addEventListener('pointerdown', (e) => {
+    cv.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      try { window.focus(); } catch (er) { /* ignore */ }
-      const l = laneAt(e.clientX, e.clientY);
-      if (l < 0) return;
-      try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
-      G.pointers.set(e.pointerId, l);
-      pressLane(l, e.timeStamp);
+      if (!G.pointers) return;
+      for (const t of e.changedTouches) {
+        const l = laneAt(t.clientX, t.clientY);
+        G.pointers.set(t.identifier, l);
+        if (l >= 0) pressLane(l, e.timeStamp);
+      }
     }, { passive: false });
-    cv.addEventListener('pointermove', (e) => {
-      if (!G.pointers || !G.pointers.has(e.pointerId)) return;
-      const old = G.pointers.get(e.pointerId), l = laneAt(e.clientX, e.clientY);
-      if (l === old) return;
-      if (old >= 0) releaseLane(old);
-      G.pointers.set(e.pointerId, l);
-      if (l >= 0) pressLane(l, e.timeStamp);
-    });
+    cv.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!G.pointers) return;
+      for (const t of e.changedTouches) {
+        if (!G.pointers.has(t.identifier)) continue;
+        const old = G.pointers.get(t.identifier), l = laneAt(t.clientX, t.clientY);
+        if (l === old) continue;
+        if (old >= 0) releaseLane(old);
+        G.pointers.set(t.identifier, l);
+        if (l >= 0) pressLane(l, e.timeStamp);
+      }
+    }, { passive: false });
     const up = (e) => {
-      if (!G.pointers || !G.pointers.has(e.pointerId)) return;
-      const l = G.pointers.get(e.pointerId); G.pointers.delete(e.pointerId);
-      if (l >= 0) releaseLane(l);
+      if (!G.pointers) return;
+      for (const t of e.changedTouches) {
+        if (!G.pointers.has(t.identifier)) continue;
+        const l = G.pointers.get(t.identifier); G.pointers.delete(t.identifier);
+        if (l >= 0) releaseLane(l);
+      }
     };
-    cv.addEventListener('pointerup', up);
-    cv.addEventListener('pointercancel', up);
-    cv.addEventListener('lostpointercapture', up);
+    cv.addEventListener('touchend', up, { passive: true });
+    cv.addEventListener('touchcancel', up, { passive: true });
+    cv.addEventListener('mousedown', () => { try { window.focus(); } catch (er) { /* ignore */ } });   // PC: 키보드 입력이 이 창으로 오게
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
     root.addEventListener('pointerdown', () => lobbyKick(), { capture: true });
